@@ -4,3 +4,8 @@ While mongo mmaps data into RAM that only provides a speedup if your data is alr
 
 mongosort attempts to sort ondisk data ordered by the primary key `_id` so that when using custom `_id` values and querying based on that sort order, it takes as few seeks as possible to map data in from disk.
 
+# References
+
+http://2013.nosql-matters.org/bcn/wp-content/uploads/2013/12/storage-talk-mongodb.pdf
+https://speakerdeck.com/mathias/storage-internals
+
