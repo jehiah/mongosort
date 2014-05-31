@@ -11,38 +11,43 @@ import (
 // https://github.com/mongodb/mongo/blob/v2.0/db/namespace.h#L132
 
 type HashNode struct {
-	hash  int32     // 4byte
-	key   []byte // 128
-	value []byte // 496
-} // 628
+	Offset           int64
+	Hash             int32             // 4byte
+	Namespace        string            // 128 bytes
+	NamespaceDetails *NamespaceDetails // 496 bytes
+} // 628 bytes total
+const hashNodeSize = 628
+
+func nullTerminatedString(b []byte) string {
+	chunks := bytes.SplitAfterN(b, []byte("\x00"), 2)
+	return string(chunks[0])
+}
 
 func ReadHashNode(f *os.File, offset int64) (*HashNode, error) {
-	b := make([]byte, 628)
+	b := make([]byte, hashNodeSize)
 	l, err := f.ReadAt(b, offset)
 	if err != nil {
 		return nil, err
 	}
-	if l != 628 {
+	if l != hashNodeSize {
 		return nil, errors.New("didn't read 628 bytes")
 	}
 	r := bytes.NewReader(b)
-	h := &HashNode{
-		key: make([]byte, 128),
-		value: make([]byte, 496),
+	h := &HashNode{Offset: offset}
+
+	binary.Read(r, binary.LittleEndian, &h.Hash)
+	if h.Hash == 0 {
+		return h, nil
 	}
-	binary.Read(r, binary.LittleEndian, &h.hash)
-	copy(h.key, b[4:128+4])
-	copy(h.value, b[128+4:])
+	h.Namespace = nullTerminatedString(b[4 : 128+4])
+
+	// NamespaceDetails := b[128+4:]
+
 	return h, nil
 }
 
 func (h *HashNode) String() string {
-	chunks := bytes.SplitAfterN(h.key, []byte("\x00"), 2)
-	return string(chunks[0])
-}
-
-type Namespace struct {
-	buf [128]byte // null terminated string w/ the name
+	return h.Namespace
 }
 
 type NamespaceDetails struct {

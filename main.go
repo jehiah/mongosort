@@ -19,7 +19,7 @@ func main() {
 		log.Fatalf("failed stating %s %s", *fileName, err)
 	}
 	size := s.Size()
-	log.Printf("size %d", size)
+	log.Printf("%s size %d", *fileName, size)
 
 	var i int64
 	blockSize := int64(628)
@@ -31,9 +31,9 @@ func main() {
 		if err != nil {
 			log.Fatalf("err reading at %d %s", i, err)
 		}
-		if h.hash == 0 {
+		if h.Hash == 0 {
 			continue
 		}
-		log.Printf("at %d hashtable entry %d %s", i, h.hash, h.String())
+		log.Printf("at %d hashtable entry %d %s", i, h.Hash, h.String())
 	}
 }
