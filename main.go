@@ -22,6 +22,9 @@ func main() {
 		if hn.Hash != 0 {
 			log.Printf("at file offset %d hashtable entry %d for %s", hn.Offset, hn.Hash, hn.Namespace)
 			log.Printf("\t%s", hn.NamespaceDetails)
+			if hn.NamespaceDetails.NumberIndexes != 0 {
+				hn.NamespaceDetails.DumpIndexDetails()
+			}
 		}
 	}
 }

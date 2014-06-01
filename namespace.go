@@ -7,7 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"path"
+	"strings"
 	"os"
+
+	"labix.org/v2/mgo/bson"
 )
 
 // structure is taken from 
@@ -20,6 +24,7 @@ func ReadNamespace(f *os.File) (*Namespace, error) {
 		log.Printf("failed stating file %s", err)
 		return nil, err
 	}
+	n.Dir = path.Dir(f.Name())
 	size := s.Size()
 	if size%(1024*1024) != 0 {
 		return nil, fmt.Errorf("file size %d must be multiple of 1048576", size)
@@ -27,7 +32,7 @@ func ReadNamespace(f *os.File) (*Namespace, error) {
 
 	var i int64
 	for ; i <= size-hashNodeSize; i += hashNodeSize {
-		h, err := ReadHashNode(f, i)
+		h, err := ReadHashNode(f, i, n.Dir)
 		if err != nil {
 			return nil, fmt.Errorf("error reading at %d of size %d %s", i, size, err)
 		}
@@ -41,6 +46,7 @@ func ReadNamespace(f *os.File) (*Namespace, error) {
 
 type Namespace struct {
 	File      *os.File
+	Dir       string
 	HashTable []*HashNode
 }
 
@@ -57,7 +63,7 @@ func nullTerminatedString(b []byte) string {
 	return string(chunks[0])
 }
 
-func ReadHashNode(f *os.File, offset int64) (*HashNode, error) {
+func ReadHashNode(f *os.File, offset int64, dir string) (*HashNode, error) {
 	b := make([]byte, hashNodeSize)
 	l, err := f.ReadAt(b, offset)
 
@@ -78,10 +84,12 @@ func ReadHashNode(f *os.File, offset int64) (*HashNode, error) {
 
 	namespaceDetailsReader := bytes.NewReader(b[128+4:])
 	nd, err := ReadNamespaceDetails(namespaceDetailsReader)
+	nd.NamespaceBase = strings.Split(h.Namespace, ".")[0]
 	if err != nil {
 		return nil, err
 	}
 	h.NamespaceDetails = nd
+	h.NamespaceDetails.Dir = dir
 	return h, nil
 }
 
@@ -105,18 +113,30 @@ type NamespaceDetails struct {
 	IndexDetails [10]IndexDetails // _indexes
 
 	/*-------- end data 496 bytes */
+	NamespaceBase string
+	Dir           string
 }
 
 func (nd *NamespaceDetails) String() string {
-	return fmt.Sprintf("first: %s, last: %s deletedList:%s size: %d records:%d extentSize: %d indexes: %d %s",
+
+	return fmt.Sprintf("first: %s, last: %s deletedList:%s size: %d records:%d extentSize: %d ",
 		nd.FirstExtent,
 		nd.LastExtent,
 		nd.DeletedList,
 		nd.Datasize,
 		nd.NumberRecords,
-		nd.LastExtentSize,
-		nd.NumberIndexes,
-		nd.IndexDetails[:nd.NumberIndexes])
+		nd.LastExtentSize)
+}
+
+func (nd *NamespaceDetails) DumpIndexDetails() {
+	fmt.Printf("\tIndexes: %d", nd.NumberIndexes)
+	for _, i := range nd.IndexDetails[:nd.NumberIndexes] {
+		o, err := i.Info.GetBsonObj(nd.Dir, nd.NamespaceBase)
+		if err != nil {
+			log.Fatalf("failed getting %s", err)
+		}
+		fmt.Printf("\t\t%#v", o)
+	}
 }
 
 func ReadNamespaceDetails(r io.Reader) (*NamespaceDetails, error) {
@@ -161,6 +181,37 @@ func (id IndexDetails) String() string {
 type DiskLoc struct {
 	FileCounter int32
 	Offset      int32
+}
+
+type Info struct {
+	Key string `bson:"key"`
+	Ns string `bson:"ns"`
+}
+
+func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) {
+	file := path.Join(dir, fmt.Sprintf("%s.%d", namespace, dl.FileCounter))
+	f, err := os.Open(file)
+	if err != nil {
+		log.Printf("failed opening %s %s", file, err)
+		return nil, err
+	}
+	f.Seek(int64(dl.Offset), 0)
+	var dataSize int32
+	if err := binary.Read(f, binary.LittleEndian, &dataSize); err != nil {
+		return nil, err
+	}
+	log.Printf("is %d size", dataSize)
+	b := make([]byte, dataSize)
+	var data *Info
+	l, err := f.Read(b)
+	if int32(l) != dataSize || (err != nil && err != io.EOF) {
+		return nil, err
+	}
+	if err := bson.Unmarshal(b, &data); err != nil {
+		log.Printf("failed unmarshaling %s %s", b, err)
+		return nil, err
+	}
+	return data, nil
 }
 
 func (d DiskLoc) String() string {
