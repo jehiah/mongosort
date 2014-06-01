@@ -20,7 +20,8 @@ func main() {
 	}
 	for _, hn := range namespace.HashTable {
 		if hn.Hash != 0 {
-			log.Printf("at %d hashtable entry %d %s", hn.Offset, hn.Hash, hn.Namespace)
+			log.Printf("at file offset %d hashtable entry %d for %s", hn.Offset, hn.Hash, hn.Namespace)
+			log.Printf("\t%s", hn.NamespaceDetails)
 		}
 	}
 }
