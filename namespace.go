@@ -201,11 +201,11 @@ func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) 
 		return nil, err
 	}
 
-	// this is record packed ?
+	// this is record packed
 	// namespace_details_collection_entry.cpp line 
 	
-	f.Seek(12, 1)
-	log.Printf("is %d size", dataSize)
+	f.Seek(recordHeader - 4, 1)
+	// log.Printf("is %d size", dataSize)
 	b := make([]byte, dataSize-recordHeader)
 	var data interface{}
 	l, err := f.Read(b)
@@ -219,8 +219,8 @@ func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) 
 	if b[dataSize-recordHeader - 1] != '\x00' {
 		return nil, fmt.Errorf("bson not null terminated %q", b)
 	}
-	log.Printf("raw bson is %q", b)
 	if err := bson.Unmarshal(b, &data); err != nil {
+		log.Printf("raw bson is %q", b)
 		log.Printf("failed unmarshaling %s %s", b, err)
 		return nil, err
 	}
