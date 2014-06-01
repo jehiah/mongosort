@@ -129,13 +129,13 @@ func (nd *NamespaceDetails) String() string {
 }
 
 func (nd *NamespaceDetails) DumpIndexDetails() {
-	fmt.Printf("\tIndexes: %d", nd.NumberIndexes)
+	log.Printf("\tIndexes: %d", nd.NumberIndexes)
 	for _, i := range nd.IndexDetails[:nd.NumberIndexes] {
 		o, err := i.Info.GetBsonObj(nd.Dir, nd.NamespaceBase)
 		if err != nil {
 			log.Fatalf("failed getting %s", err)
 		}
-		fmt.Printf("\t\t%#v", o)
+		log.Printf("\t\t%#v", o)
 	}
 }
 
@@ -200,13 +200,22 @@ func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) 
 	if err := binary.Read(f, binary.LittleEndian, &dataSize); err != nil {
 		return nil, err
 	}
+	f.Seek(-4, 1)
 	log.Printf("is %d size", dataSize)
-	b := make([]byte, dataSize)
-	var data *Info
+	b := make([]byte, dataSize+5)
+	var data interface{}
 	l, err := f.Read(b)
-	if int32(l) != dataSize || (err != nil && err != io.EOF) {
-		return nil, err
+	if int32(l) != dataSize+5 || (err != nil && err != io.EOF) {
+		if err != nil {
+			return nil, err
+		} else {
+			return nil, fmt.Errorf("unexpected read of %d for size %d", l, dataSize)
+		}
 	}
+	if b[dataSize-1] != '\x00' {
+		return nil, fmt.Errorf("bson not null terminated %q", b)
+	}
+	log.Printf("raw bson is %q", b)
 	if err := bson.Unmarshal(b, &data); err != nil {
 		log.Printf("failed unmarshaling %s %s", b, err)
 		return nil, err
