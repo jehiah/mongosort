@@ -102,19 +102,21 @@ type NamespaceDetails struct {
 
 	// // ofs 192
 	// IndexDetails _indexes[NIndexesBase];
+	IndexDetails [10]IndexDetails // _indexes
 
 	/*-------- end data 496 bytes */
 }
 
 func (nd *NamespaceDetails) String() string {
-	return fmt.Sprintf("first: %s, last: %s deletedList:%s size: %d records:%d extentSize: %d indexes: %d",
+	return fmt.Sprintf("first: %s, last: %s deletedList:%s size: %d records:%d extentSize: %d indexes: %d %s",
 		nd.FirstExtent,
 		nd.LastExtent,
 		nd.DeletedList,
 		nd.Datasize,
 		nd.NumberRecords,
 		nd.LastExtentSize,
-		nd.NumberIndexes)
+		nd.NumberIndexes,
+		nd.IndexDetails[:nd.NumberIndexes])
 }
 
 func ReadNamespaceDetails(r io.Reader) (*NamespaceDetails, error) {
@@ -140,13 +142,27 @@ func ReadNamespaceDetails(r io.Reader) (*NamespaceDetails, error) {
 	if err := binary.Read(r, binary.LittleEndian, &nd.NumberIndexes); err != nil {
 		return nil, err
 	}
+	if err := binary.Read(r, binary.LittleEndian, &nd.IndexDetails); err != nil {
+		return nil, err
+	}
 	return nd, nil
+}
+
+type IndexDetails struct {
+	Head DiskLoc
+	Info DiskLoc
+}
+
+func (id IndexDetails) String() string {
+	// todo: get bson for .Info
+	return fmt.Sprintf("<Index head:%s info: %s>", id.Head, id.Info)
 }
 
 type DiskLoc struct {
 	FileCounter int32
 	Offset      int32
 }
+
 func (d DiskLoc) String() string {
 	if d.FileCounter < 0 {
 		return "{}"
