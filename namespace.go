@@ -5,10 +5,44 @@ import (
 	"encoding/binary"
 	"errors"
 	"os"
+	"log"
+	"fmt"
 )
 
 // structure is taken from 
 // https://github.com/mongodb/mongo/blob/v2.0/db/namespace.h#L132
+
+func ReadNamespace(f *os.File) (*Namespace, error) {
+	n := &Namespace{File:f}
+	s, err := f.Stat()
+	if err != nil {
+		log.Printf("failed stating file %s", err)
+		return nil, err
+	}
+	size := s.Size()
+	if size % (1024*1024) != 0 {
+		return nil, fmt.Errorf("file size %d must be multiple of 1048576", size)
+	}
+
+	var i int64
+	for ; i <= size - hashNodeSize; i += hashNodeSize {
+		h, err := ReadHashNode(f, i)
+		if err != nil {
+			return nil, fmt.Errorf("error reading at %d of size %d %s", i, size, err)
+		}
+		n.HashTable = append(n.HashTable, h)
+		if h.Hash == 0 {
+			continue
+		}
+		log.Printf("at %d hashtable entry %d %s", i, h.Hash, h.String())
+	}
+	return n, nil
+}
+
+type Namespace struct {
+	File *os.File
+	HashTable []*HashNode
+}
 
 type HashNode struct {
 	Offset           int64
@@ -26,6 +60,7 @@ func nullTerminatedString(b []byte) string {
 func ReadHashNode(f *os.File, offset int64) (*HashNode, error) {
 	b := make([]byte, hashNodeSize)
 	l, err := f.ReadAt(b, offset)
+	
 	if err != nil {
 		return nil, err
 	}

@@ -14,26 +14,13 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed opening %s %s", *fileName, err)
 	}
-	s, err := os.Stat(*fileName)
+	namespace, err := ReadNamespace(f)
 	if err != nil {
-		log.Fatalf("failed stating %s %s", *fileName, err)
+		log.Fatalf("%s", err)
 	}
-	size := s.Size()
-	log.Printf("%s size %d", *fileName, size)
-
-	var i int64
-	blockSize := int64(628)
-	for ; i < size; i += blockSize {
-		if i+4+128 > size {
-			break
+	for _, hn := range namespace.HashTable {
+		if hn.Hash != 0 {
+			log.Printf("at %d hashtable entry %d %s", hn.Offset, hn.Hash, hn.Namespace)
 		}
-		h, err := ReadHashNode(f, i)
-		if err != nil {
-			log.Fatalf("err reading at %d %s", i, err)
-		}
-		if h.Hash == 0 {
-			continue
-		}
-		log.Printf("at %d hashtable entry %d %s", i, h.Hash, h.String())
 	}
 }
