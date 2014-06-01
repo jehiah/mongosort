@@ -7,14 +7,14 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os"
 	"path"
 	"strings"
-	"os"
 
 	"labix.org/v2/mgo/bson"
 )
 
-// structure is taken from 
+// structure is taken from
 // https://github.com/mongodb/mongo/blob/v2.0/db/namespace.h#L132
 
 func ReadNamespace(f *os.File) (*Namespace, error) {
@@ -185,7 +185,7 @@ type DiskLoc struct {
 
 type Info struct {
 	Key string `bson:"key"`
-	Ns string `bson:"ns"`
+	Ns  string `bson:"ns"`
 }
 
 func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) {
@@ -200,19 +200,23 @@ func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) 
 	if err := binary.Read(f, binary.LittleEndian, &dataSize); err != nil {
 		return nil, err
 	}
-	f.Seek(-4, 1)
+
+	// this is record packed ?
+	// namespace_details_collection_entry.cpp line 
+	
+	f.Seek(12, 1)
 	log.Printf("is %d size", dataSize)
-	b := make([]byte, dataSize+5)
+	b := make([]byte, dataSize-recordHeader)
 	var data interface{}
 	l, err := f.Read(b)
-	if int32(l) != dataSize+5 || (err != nil && err != io.EOF) {
+	if int32(l) != dataSize-recordHeader || (err != nil && err != io.EOF) {
 		if err != nil {
 			return nil, err
 		} else {
 			return nil, fmt.Errorf("unexpected read of %d for size %d", l, dataSize)
 		}
 	}
-	if b[dataSize-1] != '\x00' {
+	if b[dataSize-recordHeader - 1] != '\x00' {
 		return nil, fmt.Errorf("bson not null terminated %q", b)
 	}
 	log.Printf("raw bson is %q", b)

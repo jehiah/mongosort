@@ -18,6 +18,7 @@ type Record struct {
 	// 4 prev Record
 	// .. data (may be larger than obj if padded)
 }
+const recordHeader = 16
 
 type BtreeBucket struct {
 	// Parent
