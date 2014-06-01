@@ -135,7 +135,7 @@ func (nd *NamespaceDetails) DumpIndexDetails() {
 		if err != nil {
 			log.Fatalf("failed getting %s", err)
 		}
-		log.Printf("\t\t%#v", o)
+		log.Printf("\t\t%s %#v", i.Head, o)
 	}
 }
 
@@ -202,9 +202,9 @@ func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) 
 	}
 
 	// this is record packed
-	// namespace_details_collection_entry.cpp line 
-	
-	f.Seek(recordHeader - 4, 1)
+	// namespace_details_collection_entry.cpp line
+
+	f.Seek(recordHeader-4, 1)
 	// log.Printf("is %d size", dataSize)
 	b := make([]byte, dataSize-recordHeader)
 	var data interface{}
@@ -216,7 +216,7 @@ func (dl DiskLoc) GetBsonObj(dir string, namespace string) (interface{}, error) 
 			return nil, fmt.Errorf("unexpected read of %d for size %d", l, dataSize)
 		}
 	}
-	if b[dataSize-recordHeader - 1] != '\x00' {
+	if b[dataSize-recordHeader-1] != '\x00' {
 		return nil, fmt.Errorf("bson not null terminated %q", b)
 	}
 	if err := bson.Unmarshal(b, &data); err != nil {
